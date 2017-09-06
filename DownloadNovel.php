@@ -1,40 +1,43 @@
 <?php
-set_time_limit(0);
-ini_set('memory_limit', -1);
-date_default_timezone_set('PRC');
-
 /**
- * download novel from http://www.xs74.com
+ * download novel
  * User: tianyu
  *
  */
+namespace Download;
 
-
-
-require 'vendor/autoload.php';
 
 use DiDom\Document;
 
-$download = new download();
-$download->getTxt();
-echo "done\n";
 
-class download
+
+class DownloadNovel
 {
-    public $url = 'http://www.xs74.com/novel/wodiweixinliansanjie/txt.html'; //首页链接
+    public $url = ''; //章节列表链接
     public $href; //子页面链接
     public $file_name; //文件名
+    public $title; //标题
     public $arr_href = []; //已经抓取过的页面
-    public $html;
-    public $parse_html;
-    public $content;
-    public $page;
-    public $start = 0;
-    public $end = 0;
+    public $html; //页面html
+    public $parse_html; //解析过的html
+    public $title_labels; //章节标签
+    public $chapter_labels; //章节列表标签
+    public $content_labels; //章节内容标签
+    public $page_labels; //子章节分页标签
+    public $content; //内容
+    public $page; //分页
+    public $start = 0; //开始章节
+    public $end = 0; //结束章节
 
 
-    public function __construct(){
+    public function __construct($url = ''){
         $this->file_name = date('mdHis') . '.txt';
+        if($url){
+            $this->url = $url;
+        }
+        if(!$this->url){
+            exit('请输入章节列表url');
+        }
     }
 
 
@@ -65,25 +68,24 @@ class download
         }
         //echo $html_res;
         $this->parse_html = new Document($this->html);
-        $lia = $this->parse_html->find('#Chapters li a');
+        $lia = $this->parse_html->find($this->chapter_labels);
         foreach ($lia as $k => $v){
-            //开始章节
+            $k ++;
+
             if($this->start > 0 && $k < $this->start){
                 continue;
             }
-            //结束章节
+
             if($this->end > 0 && $k > $this->end){
                 break;
             }
-            //echo $v->text(), $k;
+
             $this->href = $v->attr('href');
             if($this->is_in()){
                 continue;
             }
 
-
-            $this->parse_html();
-
+            $this->parse_html($is_title = 1);
             $arr_sub_href = $this->page->find('a[href]');
             $sub_count = count($arr_sub_href);
             foreach ($arr_sub_href as $key => $val){
@@ -108,12 +110,16 @@ class download
     }
 
 
-    public function parse_html(){
+    public function parse_html($is_title = 0){
         $this->html = file_get_contents($this->href);
         $this->to_utf8();
         $this->parse_html = new Document($this->html);
-        $this->content = $this->parse_html->find('#content')[0]->text();
-        $this->page = $this->parse_html->find('#content .text')[0];
+        if($is_title && $this->title_labels){
+            $this->content = $this->parse_html->find($this->title_labels)[0]->text();
+            $this->write();
+        }
+        $this->content = $this->parse_html->find($this->content_labels)[0]->text();
+        $this->page = $this->parse_html->find($this->page_labels)[0];
         $this->content = str_replace($this->page->text(), '', $this->content);
         $this->content = str_replace('　　', "\n", $this->content);
         $this->write();
